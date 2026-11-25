@@ -1,0 +1,443 @@
+<title>Xpify Mindmap 3D</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;700&family=Inter:wght@400;500;600&display=swap">
+<style>
+/* Layout: Vollbild-3D-Raum, schwebende Bedienfelder an den Rändern. Bewusst nur dunkles Design (Spielwelt bei Nacht). */
+:root {
+  --bg: #0a0e1d;
+  --panel: rgba(17, 22, 46, 0.88);
+  --panel-line: rgba(140, 160, 255, 0.18);
+  --fg: #e9ecff;
+  --muted: #8f97bd;
+  --gold: #ffc94a;
+  --gold-ink: #241a00;
+  --cyan: #63e2ff;
+  --risk: #ff8573;
+  --font-display: 'Chakra Petch', 'Segoe UI', system-ui, sans-serif;
+  --font-body: 'Inter', 'Segoe UI', system-ui, sans-serif;
+  color-scheme: dark;
+}
+html, body { height: 100%; }
+[hidden] { display: none !important; }
+body { background: var(--bg); color: var(--fg); font-family: var(--font-body); overflow: hidden; }
+#stage { position: fixed; inset: 0; }
+#stage canvas { display: block; touch-action: none; }
+#labels { position: fixed; inset: 0; pointer-events: none; overflow: hidden; }
+
+.lbl {
+  position: absolute; left: 0; top: 0; white-space: nowrap; pointer-events: auto; cursor: pointer;
+  font-size: 12px; color: var(--muted); padding: 2px 7px; border-radius: 4px;
+  text-shadow: 0 1px 3px rgba(0,0,0,.9); will-change: transform, opacity; user-select: none;
+}
+.lbl.main { font-family: var(--font-display); font-weight: 700; font-size: 15px; color: var(--fg); letter-spacing: .06em; text-transform: uppercase; }
+.lbl.root { font-size: 22px; letter-spacing: .08em; }
+.lbl.t2 { color: var(--cyan); font-weight: 600; font-size: 13px; background: rgba(10,14,29,.72); border: 1px solid rgba(99,226,255,.45); text-shadow: none; }
+.lbl.t1 { font-family: var(--font-display); font-weight: 700; font-size: 15px; color: var(--gold-ink); background: var(--gold); text-shadow: none; box-shadow: 0 0 22px rgba(255,201,74,.5); }
+.lbl.t1 .rk { display: inline-block; margin-right: 6px; padding: 0 5px; border-radius: 3px; background: var(--gold-ink); color: var(--gold); font-size: 12px; }
+.lbl.risk { color: var(--risk); border: 1px dashed rgba(255,133,115,.6); background: rgba(10,14,29,.72); text-shadow: none; }
+.lbl.sel { outline: 2px solid var(--fg); outline-offset: 2px; }
+.lbl:focus-visible { outline: 2px solid var(--cyan); outline-offset: 2px; }
+
+.ui { position: fixed; z-index: 5; background: var(--panel); border: 1px solid var(--panel-line); border-radius: 10px; backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); }
+#head { top: max(16px, env(safe-area-inset-top, 0px)); left: max(16px, env(safe-area-inset-left, 0px)); padding: 14px 16px; display: grid; gap: 10px; max-width: min(360px, calc(100vw - 32px)); }
+#head .eyebrow { font-size: 11px; letter-spacing: .12em; text-transform: uppercase; color: var(--muted); }
+#head h1 { margin: 0; font-family: var(--font-display); font-size: 22px; font-weight: 700; letter-spacing: .02em; }
+#head .hint { font-size: 12px; color: var(--muted); line-height: 1.5; }
+.seg { display: flex; gap: 4px; flex-wrap: wrap; }
+.seg button, .btn {
+  font: 500 12px var(--font-body); color: var(--fg); background: transparent; border: 1px solid var(--panel-line);
+  border-radius: 6px; padding: 6px 10px; cursor: pointer;
+}
+.seg button[aria-pressed="true"] { background: var(--fg); color: var(--bg); border-color: var(--fg); }
+.seg button:focus-visible, .btn:focus-visible, .top li button:focus-visible, .chip:focus-visible { outline: 2px solid var(--cyan); outline-offset: 2px; }
+.legend { display: flex; flex-wrap: wrap; gap: 6px 12px; font-size: 11px; color: var(--muted); }
+.legend span { display: inline-flex; align-items: center; gap: 6px; }
+.dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; }
+
+#top { top: max(16px, env(safe-area-inset-top, 0px)); right: max(16px, env(safe-area-inset-right, 0px)); width: 290px; padding: 14px 14px 10px; }
+#top h2, #detail h2 { margin: 0 0 8px; font-family: var(--font-display); font-size: 14px; letter-spacing: .1em; text-transform: uppercase; color: var(--gold); }
+.top { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; }
+.top li button {
+  width: 100%; display: grid; grid-template-columns: 26px 1fr; gap: 8px; align-items: start; text-align: left;
+  background: transparent; border: 0; color: var(--fg); font: 500 13px/1.35 var(--font-body); padding: 6px 4px; border-radius: 6px; cursor: pointer;
+}
+.top li button:hover { background: rgba(255,201,74,.1); }
+.top .n { font-family: var(--font-display); font-weight: 700; color: var(--gold); font-variant-numeric: tabular-nums; }
+.top small { display: block; color: var(--muted); font-size: 11px; font-weight: 400; }
+#topToggle { display: none; }
+
+#detail { left: max(16px, env(safe-area-inset-left, 0px)); bottom: max(16px, env(safe-area-inset-bottom, 0px)); width: min(380px, calc(100vw - 32px)); padding: 14px 16px; display: grid; gap: 8px; }
+#detail .path { font-size: 11px; color: var(--muted); letter-spacing: .04em; }
+#detail h3 { margin: 0; font-family: var(--font-display); font-size: 19px; font-weight: 700; text-wrap: balance; }
+#detail p { margin: 0; font-size: 13px; line-height: 1.55; color: var(--fg); }
+.badge { justify-self: start; font-size: 11px; font-weight: 600; padding: 2px 8px; border-radius: 999px; letter-spacing: .04em; }
+.badge.t1 { background: var(--gold); color: var(--gold-ink); }
+.badge.t2 { border: 1px solid var(--cyan); color: var(--cyan); }
+.badge.t3 { border: 1px solid var(--muted); color: var(--muted); }
+.badge.risk { border: 1px dashed var(--risk); color: var(--risk); }
+.chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.chip { font: 500 12px var(--font-body); color: var(--fg); background: rgba(255,255,255,.05); border: 1px solid var(--panel-line); border-radius: 999px; padding: 4px 10px; cursor: pointer; }
+.chip.t1 { border-color: var(--gold); color: var(--gold); }
+.chip.t2 { border-color: rgba(99,226,255,.6); color: var(--cyan); }
+.row { display: flex; gap: 8px; flex-wrap: wrap; }
+
+@media (max-width: 760px) {
+  #head { padding: 10px 12px; gap: 8px; max-width: calc(100vw - 32px); right: max(16px, env(safe-area-inset-right, 0px)); }
+  #head h1 { font-size: 18px; }
+  #head .hint, .legend { display: none; }
+  #top { top: auto; bottom: max(16px, env(safe-area-inset-bottom, 0px)); right: max(16px, env(safe-area-inset-right, 0px)); left: max(16px, env(safe-area-inset-left, 0px)); width: auto; max-height: 45vh; overflow: auto; }
+  #top.collapsed .top { display: none; }
+  #top.collapsed h2 { margin: 0; }
+  #topToggle { display: inline-block; float: right; margin-top: -4px; }
+  #detail { bottom: auto; top: 150px; }
+  .lbl.t3, .lbl.risk { font-size: 11px; }
+}
+</style>
+
+<div id="stage"></div>
+<div id="labels"></div>
+
+<header id="head" class="ui">
+  <div>
+    <div class="eyebrow">Mindmap · Stand 25.11.2026 · Beta in <span id="countdown">37</span> Tagen</div>
+    <h1>Xpify Social</h1>
+  </div>
+  <div class="seg" role="group" aria-label="Filter">
+    <button id="f-all" aria-pressed="true">Alles</button>
+    <button id="f-imp" aria-pressed="false">Top + Wichtig</button>
+    <button id="f-top" aria-pressed="false">Nur Top</button>
+    <button id="f-reset" class="btn">Übersicht</button>
+  </div>
+  <div class="legend">
+    <span><i class="dot" style="background:var(--gold)"></i>Top-Priorität</span>
+    <span><i class="dot" style="background:var(--cyan)"></i>Wichtig</span>
+    <span><i class="dot" style="background:var(--risk)"></i>Risiko / testen</span>
+    <span><i class="dot" style="background:var(--muted)"></i>Idee</span>
+  </div>
+  <a id="gdLink" class="btn" href="../game-designer/ideen-3d.html" hidden style="justify-self:start;text-decoration:none">Zu den App-Ideen (Spiel-Designer) →</a>
+  <div class="hint">Scrollen zoomt · Ziehen dreht · Rechtsklick-Ziehen verschiebt · Punkt antippen für Details</div>
+</header>
+
+<aside id="top" class="ui">
+  <h2>Deine Top 8 <button id="topToggle" class="btn" aria-expanded="true">einklappen</button></h2>
+  <ol class="top" id="topList"></ol>
+</aside>
+
+<section id="detail" class="ui" hidden aria-live="polite">
+  <div class="path" id="dPath"></div>
+  <h3 id="dName"></h3>
+  <span class="badge" id="dBadge"></span>
+  <p id="dNote"></p>
+  <div class="chips" id="dKids"></div>
+  <div class="row"><button class="btn" id="dUp">Eine Ebene hoch</button><button class="btn" id="dClose">Schließen</button></div>
+</section>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+<script>
+// t: 1 = Top, 2 = wichtig, sonst Idee. r: Risiko/testen. rank: Reihenfolge der Top-Liste. note: Erklärung im Detailfenster.
+const DATA = {"n":"Xpify Social","note":"Alles, was wir für TikTok und Instagram planen. Gold = zuerst erledigen.","c":[{"n":"Ziele","c":[{"n":"Beta-Start 01.01.2027","t":1,"rank":8,"note":"Fester Termin und natürlicher Countdown. Jedes Video bis dahin zahlt auf die Warteliste ein."},{"n":"Warteliste und Beta-Tester sammeln","t":1,"rank":7,"note":"Das Hauptziel bis zur Beta. Follower sind nett, Einträge auf der Warteliste zählen."},{"n":"Zahlenziele festlegen","t":1,"rank":3,"note":"Fehlt noch. Ohne Zahl wissen wir nicht, ob ein Video funktioniert hat. Wir legen Follower- und Tester-Ziele gemeinsam fest."}]},{"n":"Zielgruppe","c":[{"n":"Ab 16 Jahren","t":2,"note":"Rechtliche Grenze: keine Inhalte, die gezielt Jüngere ansprechen."},{"n":"Breite Masse mit Lust auf Selbstverbesserung"},{"n":"Fitness"},{"n":"Ernährung"},{"n":"Lernen und Studium"}]},{"n":"Content-Säulen","c":[{"n":"Build in Public","t":2,"note":"Du zeigst öffentlich, wie du die App baust. Deine glaubwürdigste Säule.","c":[{"n":"Anfänger baut App mit KI","t":1,"rank":6,"note":"Deine stärkste Story: echt, überraschend und für jeden nachvollziehbar."},{"n":"Countdown bis zur Beta","t":2,"note":"Gibt jedem Video einen Grund, dranzubleiben: Tag X von 37."},{"n":"Pannen und Erfolge"},{"n":"Serie Ich teste meine eigene App","t":1,"rank":5,"note":"Ehrlich, wiederholbar, mit eingebautem Countdown. Folge 1: Ich lasse mir von meiner eigenen KI einen Trainingsplan machen."},{"n":"KI macht die Fleißarbeit"}]},{"n":"Leben als Spiel","c":[{"n":"XP für Alltag"},{"n":"POV Level-Up"},{"n":"Serie Let's LARP in","r":1,"note":"Starke Struktur mit drei festen Orten. Den Begriff LARP kennt aber vermutlich nur eine Nische.","c":[{"n":"Bibliothek"},{"n":"Gym"},{"n":"Diner"},{"n":"Begriff LARP testen","r":1,"note":"A/B-Test: „Let's LARP in …“ gegen eine verständliche Variante wie „Level 1 im Gym“."}]}]},{"n":"Coach-Wissen","c":[{"n":"Fitness-Tipps"},{"n":"Ernährungs-Tipps"},{"n":"Lern-Tipps"}]},{"n":"Community","c":[{"n":"Abstimmungen über Funktionen"},{"n":"Fragen beantworten"},{"n":"Feedback-Fenster in der Beta","t":2,"note":"Argument für Tester: Du baust mit."}]}]},{"n":"Eyecatcher-Funktionen","c":[{"n":"Jetzt oder bald filmbar","t":2,"note":"Bis zur Beta tragen diese Funktionen deine Videos.","c":[{"n":"Coach lässt Ausreden nicht durchgehen","t":1,"rank":4,"note":"Platz 1 der Eyecatcher. Jeder kennt „lief ganz gut“. Witzig und erklärt die App ohne Werbung. Drehbar, sobald der Coach-Chat läuft."},{"n":"Konferenz plant meinen Tag","t":2,"note":"Schon gebaut. Braucht einen starken Hook, etwa: Mein KI-Team hat heute über mich beraten."},{"n":"3D-Stadt nur mit starkem Schnitt","r":1,"note":"Wirkt pur noch schwach. Nur mit Green-Screen, Zooms und schnellen Schnitten."},{"n":"Fragekarten beim Kennenlernen"}]},{"n":"Vor der Beta wenn gebaut","c":[{"n":"Level-Up-Moment mit XP","t":2,"note":"Frühestens Ende Dezember (Schätzung des Spiel-Designers, keine Zusage)."},{"n":"Gym wächst in 3 Schritten","note":"Nur mit Test-XP aus der Entwicklerversion. Offen so kennzeichnen."}]},{"n":"Nach der Beta","c":[{"n":"Gym-Tower mit Etagen","note":"Grob Februar bis März 2027. Vorher nicht ankündigen."},{"n":"Stadtbewohner werden sichtbar fitter"},{"n":"Fokus-Timer mit wachsendem Baum","note":"Ähnliche Apps gibt es schon. Im Content die KI-Abfrage am Ende in den Vordergrund stellen."}]},{"n":"Ehrlich als geplant zeigen","t":2},{"n":"Nichts ankündigen ohne dein OK","t":2,"note":"Termine und Funktionen gehen erst öffentlich raus, wenn du zustimmst."}]},{"n":"Formate","c":[{"n":"Talking Head","t":2,"note":"Dein Gesicht schafft Vertrauen. Am Anfang das wichtigste Format."},{"n":"Screen-Recording der 3D-Stadt","c":[{"n":"Risiko wirkt noch schwach","r":1},{"n":"Aufwerten mit Green-Screen","t":2,"note":"Du sprichst vor der App. Testvideo gegen reines Screen-Recording vergleichen."},{"n":"Zooms und schnelle Schnitte"}]},{"n":"POV-Sketche"},{"n":"Vorher-Nachher der App"},{"n":"Gespräch mit einem Coach","t":2}]},{"n":"Plattformen","c":[{"n":"TikTok"},{"n":"Instagram Reels"},{"n":"Instagram Stories"}]},{"n":"Branding","c":[{"n":"Namens- und Hashtag-Ideen","c":[{"n":"City of Hustlers","note":"Passt am besten zur 3D-Stadt."},{"n":"Hustle Factory","r":1,"note":"„Hustle“ klingt nach Druck und Dauer-Grind."},{"n":"Coach craft","r":1,"note":"Eingängig, erinnert aber an ein bekanntes Spiel."},{"n":"Hustle gegen Friends nach Beta"}]},{"n":"Kernbotschaften","c":[{"n":"KI macht das Langweilige"},{"n":"Die KI plant, du machst","t":2,"note":"Passt zur App, weil dir niemand das Training abnimmt."}]}]},{"n":"Launch-Plan","c":[{"n":"Profil und Bio optimieren","t":1,"rank":1,"note":"Kommt vor dem ersten Video. Wer von einem Video aufs Profil kommt, muss sofort verstehen, was Xpify ist."},{"n":"Warteliste mit Link in Bio","t":1,"rank":2,"note":"Ohne Link verpufft jede Reichweite. Ein einfaches Formular reicht für den Anfang."},{"n":"Countdown-Videos","t":2},{"n":"Beta-Einladungen"},{"n":"Feedback-Fenster als Tester-Argument","t":2}]},{"n":"Recht","c":[{"n":"Impressum in Bio","t":2,"note":"Pflicht bei einem Profil mit geschäftlichem Zweck."},{"n":"Commercial Music Library","t":2,"note":"Bei Business-Accounts nur lizenzfreie Sounds."},{"n":"Keine Heilsversprechen","t":2},{"n":"Werbung kennzeichnen"}]},{"n":"Ideen","c":[{"n":"Siehe Eyecatcher und Serien"}]},{"n":"Learnings","c":[{"n":"noch keine Daten","note":"Kommt nach den ersten Videos mit echten Zahlen."}]}]};
+
+const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+const V = THREE.Vector3;
+const nodes = [];
+const HUES = [0.62, 0.55, 0.75, 0.12, 0.5, 0.68, 0.85, 0.95, 0.4, 0.08, 0.58, 0.3, 0.7];
+
+(function walk(n, parent, depth, bi) {
+  n.parent = parent; n.depth = depth; n.id = nodes.length; n.c = n.c || [];
+  n.bi = depth === 1 ? HUES.length && nodes.filter(x => x.depth === 1).length : bi;
+  n.t = n.t || (depth <= 1 ? 0 : 3);
+  nodes.push(n);
+  n.c.forEach(ch => walk(ch, n, depth + 1, n.bi));
+})(DATA, null, 0, 0);
+
+// Pfade zu Top-Punkten leuchten golden
+nodes.filter(n => n.t === 1).forEach(n => { let p = n; while (p) { p.hot = true; p = p.parent; } });
+
+function basis(d) {
+  const a = Math.abs(d.y) < 0.9 ? new V(0, 1, 0) : new V(1, 0, 0);
+  const u = new V().crossVectors(d, a).normalize();
+  return [u, new V().crossVectors(d, u).normalize()];
+}
+function place(n, pos, dir) {
+  n.pos = pos;
+  const k = n.c.length; if (!k) return;
+  if (n.depth === 0) {
+    n.c.forEach((c, i) => {
+      const y = 1 - (i + 0.5) / k * 2, r = Math.sqrt(1 - y * y), th = i * 2.39996;
+      const d = new V(Math.cos(th) * r, y * 0.8, Math.sin(th) * r).normalize();
+      place(c, d.clone().multiplyScalar(32), d);
+    });
+    return;
+  }
+  const [u, v] = basis(dir);
+  const spread = n.depth === 1 ? 0.9 : 0.6, len = n.depth === 1 ? 15 : 9;
+  n.c.forEach((c, i) => {
+    const alt = k > 5 && i % 2 === 1;
+    let off = new V();
+    if (k > 1) {
+      const ang = i / k * Math.PI * 2 + n.depth * 0.7, ring = alt ? spread * 0.5 : spread;
+      off = u.clone().multiplyScalar(Math.cos(ang) * ring).add(v.clone().multiplyScalar(Math.sin(ang) * ring));
+    }
+    const d = dir.clone().add(off).normalize();
+    place(c, pos.clone().add(d.clone().multiplyScalar(len + (alt ? 5 : 0))), d);
+  });
+}
+place(DATA, new V(0, 0, 0), new V(0, 1, 0));
+
+// ---------- Szene ----------
+const stage = document.getElementById('stage');
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+renderer.setClearColor(0x0a0e1d, 1);
+stage.appendChild(renderer.domElement);
+const scene = new THREE.Scene();
+scene.fog = new THREE.FogExp2(0x0a0e1d, 0.0055);
+const camera = new THREE.PerspectiveCamera(55, 1, 0.1, 2000);
+const HOME = { p: new V(0, 30, 105), t: new V(0, 0, 0) };
+camera.position.copy(HOME.p);
+const controls = new THREE.OrbitControls(camera, renderer.domElement);
+controls.enableDamping = true; controls.dampingFactor = 0.08;
+controls.minDistance = 5; controls.maxDistance = 240; controls.zoomSpeed = 0.9;
+controls.autoRotate = !reduceMotion; controls.autoRotateSpeed = 0.35;
+controls.addEventListener('start', () => { controls.autoRotate = false; fly = null; });
+
+scene.add(new THREE.AmbientLight(0xb8c0ff, 0.55));
+const key = new THREE.DirectionalLight(0xffffff, 0.8); key.position.set(40, 80, 60); scene.add(key);
+const fill = new THREE.PointLight(0x63e2ff, 0.6, 200); scene.add(fill);
+
+// Sterne
+(function () {
+  const g = new THREE.BufferGeometry(), N = 700, a = new Float32Array(N * 3);
+  for (let i = 0; i < N; i++) {
+    const d = new V(Math.random() - .5, Math.random() - .5, Math.random() - .5).normalize().multiplyScalar(320 + Math.random() * 280);
+    a.set([d.x, d.y, d.z], i * 3);
+  }
+  g.setAttribute('position', new THREE.BufferAttribute(a, 3));
+  scene.add(new THREE.Points(g, new THREE.PointsMaterial({ color: 0x8f97bd, size: 1.4, sizeAttenuation: true, fog: false })));
+})();
+
+const GOLD = new THREE.Color(0xffc94a), CYAN = new THREE.Color(0x63e2ff), RISK = new THREE.Color(0xff8573);
+function branchColor(n, l) { return new THREE.Color().setHSL(HUES[n.bi % HUES.length], 0.55, l); }
+function matFor(n) {
+  let col, em = 0.15;
+  if (n.depth === 0) { col = new THREE.Color(0xe9ecff); em = 0.5; }
+  else if (n.t === 1) { col = GOLD; em = 0.75; }
+  else if (n.r) { col = RISK; em = 0.35; }
+  else if (n.t === 2) { col = CYAN; em = 0.45; }
+  else if (n.depth === 1) { col = branchColor(n, 0.62); em = 0.35; }
+  else { col = branchColor(n, 0.42); em = 0.1; }
+  return new THREE.MeshStandardMaterial({ color: col, emissive: col, emissiveIntensity: em, roughness: 0.45, metalness: 0.1, transparent: true });
+}
+function sizeFor(n) { return n.depth === 0 ? 2.4 : n.t === 1 ? 1.35 : n.depth === 1 ? 1.5 : n.t === 2 ? 0.85 : 0.5; }
+
+const sphere = new THREE.SphereGeometry(1, 28, 18);
+const halo = (function () {
+  const c = document.createElement('canvas'); c.width = c.height = 128;
+  const x = c.getContext('2d'), gr = x.createRadialGradient(64, 64, 0, 64, 64, 64);
+  gr.addColorStop(0, 'rgba(255,255,255,1)'); gr.addColorStop(0.25, 'rgba(255,255,255,.45)'); gr.addColorStop(1, 'rgba(255,255,255,0)');
+  x.fillStyle = gr; x.fillRect(0, 0, 128, 128);
+  return new THREE.CanvasTexture(c);
+})();
+
+const meshes = [];
+nodes.forEach(n => {
+  n.mat = matFor(n);
+  n.size = sizeFor(n);
+  n.mesh = new THREE.Mesh(sphere, n.mat);
+  n.mesh.position.copy(n.pos); n.mesh.scale.setScalar(n.size); n.mesh.userData.node = n;
+  scene.add(n.mesh); meshes.push(n.mesh);
+  if (n.t === 1 || n.depth === 0) {
+    n.halo = new THREE.Sprite(new THREE.SpriteMaterial({ map: halo, color: n.depth === 0 ? 0x9fb0ff : 0xffc94a, blending: THREE.AdditiveBlending, depthWrite: false, transparent: true, opacity: 0.75 }));
+    n.halo.position.copy(n.pos); n.halo.scale.setScalar(n.size * 6); scene.add(n.halo);
+  }
+});
+
+// Verbindungen
+const edgeNodes = nodes.filter(n => n.parent);
+const lg = new THREE.BufferGeometry();
+const lp = new Float32Array(edgeNodes.length * 6), lc = new Float32Array(edgeNodes.length * 6);
+edgeNodes.forEach((n, i) => {
+  lp.set([n.parent.pos.x, n.parent.pos.y, n.parent.pos.z, n.pos.x, n.pos.y, n.pos.z], i * 6);
+  const col = n.hot ? GOLD.clone().multiplyScalar(0.85) : branchColor(n, 0.5).multiplyScalar(0.55);
+  lc.set([col.r, col.g, col.b, col.r, col.g, col.b], i * 6);
+});
+lg.setAttribute('position', new THREE.BufferAttribute(lp, 3));
+lg.setAttribute('color', new THREE.BufferAttribute(lc, 3));
+const lineMat = new THREE.LineBasicMaterial({ vertexColors: true, transparent: true, opacity: 0.75 });
+scene.add(new THREE.LineSegments(lg, lineMat));
+
+// ---------- Beschriftungen ----------
+const labelsEl = document.getElementById('labels');
+nodes.forEach(n => {
+  const el = document.createElement('div');
+  el.className = 'lbl ' + (n.depth === 0 ? 'main root' : n.depth === 1 ? 'main' : n.t === 1 ? 't1' : n.r ? 'risk' : n.t === 2 ? 't2' : 't3');
+  el.tabIndex = (n.t === 1 || n.depth <= 1) ? 0 : -1;
+  el.innerHTML = (n.rank ? '<span class="rk">' + n.rank + '</span>' : '') + (n.r && n.t !== 1 ? '! ' : '');
+  el.appendChild(document.createTextNode(n.n));
+  el.addEventListener('click', e => { e.stopPropagation(); select(n, true); });
+  el.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); select(n, true); } });
+  labelsEl.appendChild(el); n.el = el;
+});
+
+// ---------- Filter ----------
+let filter = 'all';
+function passes(n) {
+  if (n.depth <= 1) return true;
+  if (filter === 'top') return n.t === 1 || (n.hot && n.depth === 2 && false);
+  if (filter === 'imp') return n.t === 1 || n.t === 2 || n.r;
+  return true;
+}
+const dimMat = new THREE.MeshStandardMaterial({ color: 0x2a3156, emissive: 0x000000, roughness: 0.8, transparent: true, opacity: 0.35 });
+function applyFilter(f) {
+  filter = f;
+  [['f-all', 'all'], ['f-imp', 'imp'], ['f-top', 'top']].forEach(([id, v]) => document.getElementById(id).setAttribute('aria-pressed', String(v === f)));
+  nodes.forEach(n => {
+    const ok = passes(n) || (n.hot && f !== 'all' && n.c.some(passes));
+    n.mesh.material = ok ? n.mat : dimMat;
+    n.mesh.scale.setScalar(ok ? n.size : n.size * 0.6);
+  });
+  lineMat.opacity = f === 'all' ? 0.75 : 0.45;
+}
+document.getElementById('f-all').onclick = () => applyFilter('all');
+document.getElementById('f-imp').onclick = () => applyFilter('imp');
+document.getElementById('f-top').onclick = () => applyFilter('top');
+document.getElementById('f-reset').onclick = () => { select(null); flyTo(HOME.t, HOME.p); };
+
+// ---------- Top-Liste ----------
+const topList = document.getElementById('topList');
+nodes.filter(n => n.rank).sort((a, b) => a.rank - b.rank).forEach(n => {
+  const li = document.createElement('li'), b = document.createElement('button');
+  b.innerHTML = '<span class="n">' + String(n.rank).padStart(2, '0') + '</span><span></span>';
+  b.lastChild.textContent = n.n;
+  const sm = document.createElement('small'); sm.textContent = n.parent.n; b.lastChild.appendChild(sm);
+  b.onclick = () => { select(n, true); if (window.innerWidth <= 760) setTopCollapsed(true); };
+  li.appendChild(b); topList.appendChild(li);
+});
+const topEl = document.getElementById('top'), topToggle = document.getElementById('topToggle');
+function setTopCollapsed(c) { topEl.classList.toggle('collapsed', c); topToggle.textContent = c ? 'ausklappen' : 'einklappen'; topToggle.setAttribute('aria-expanded', String(!c)); }
+topToggle.onclick = () => setTopCollapsed(!topEl.classList.contains('collapsed'));
+if (window.innerWidth <= 760) setTopCollapsed(true);
+
+// Link zur privaten Ideenseite funktioniert nur lokal (Datei auf dem PC), nicht in der veröffentlichten Version
+if (location.protocol === 'file:') document.getElementById('gdLink').hidden = false;
+
+// Countdown
+(function () {
+  const days = Math.ceil((new Date(2027, 0, 1) - new Date()) / 86400000);
+  if (days > 0) document.getElementById('countdown').textContent = days;
+})();
+
+// ---------- Auswahl & Kamerafahrt ----------
+let selected = null, hovered = null, fly = null;
+const detail = document.getElementById('detail');
+function defaultNote(n) {
+  if (n.t === 1) return 'Top-Priorität. Hier fangen wir an.';
+  if (n.t === 2) return 'Wichtig, aber nach den Top-Punkten.';
+  if (n.r) return 'Risiko: erst testen, dann groß machen.';
+  if (n.depth === 1) return 'Hauptast mit ' + n.c.length + ' Unterpunkten.';
+  return n.c.length ? n.c.length + ' Unterpunkte.' : 'Idee, noch nicht priorisiert.';
+}
+function select(n, move) {
+  if (selected) selected.el.classList.remove('sel');
+  selected = n;
+  if (!n) { detail.hidden = true; return; }
+  n.el.classList.add('sel');
+  const path = []; let p = n.parent; while (p) { path.unshift(p.n); p = p.parent; }
+  document.getElementById('dPath').textContent = path.join(' › ');
+  document.getElementById('dName').textContent = n.n;
+  const bd = document.getElementById('dBadge');
+  const cls = n.t === 1 ? 't1' : n.r ? 'risk' : n.t === 2 ? 't2' : 't3';
+  bd.className = 'badge ' + cls;
+  bd.textContent = n.t === 1 ? 'Top ' + n.rank : n.r ? 'Risiko / testen' : n.t === 2 ? 'Wichtig' : n.depth <= 1 ? 'Bereich' : 'Idee';
+  document.getElementById('dNote').textContent = n.note || defaultNote(n);
+  const kids = document.getElementById('dKids'); kids.innerHTML = '';
+  n.c.forEach(c => {
+    const b = document.createElement('button');
+    b.className = 'chip ' + (c.t === 1 ? 't1' : c.t === 2 ? 't2' : '');
+    b.textContent = c.n; b.onclick = () => select(c, true); kids.appendChild(b);
+  });
+  document.getElementById('dUp').hidden = !n.parent;
+  detail.hidden = false;
+  if (move) {
+    const dist = n.depth === 0 ? 105 : n.c.length ? 32 + n.c.length * 2 : 18;
+    const dir = camera.position.clone().sub(controls.target).normalize();
+    flyTo(n.pos, n.pos.clone().add(dir.multiplyScalar(dist)));
+  }
+}
+document.getElementById('dUp').onclick = () => selected && selected.parent && select(selected.parent, true);
+document.getElementById('dClose').onclick = () => select(null);
+function flyTo(t, p) {
+  controls.autoRotate = false;
+  fly = { ft: controls.target.clone(), fp: camera.position.clone(), tt: t.clone(), tp: p.clone(), s: performance.now(), d: reduceMotion ? 1 : 900 };
+}
+
+// Klick / Hover im Raum
+const ray = new THREE.Raycaster(), mouse = new THREE.Vector2();
+let downAt = null;
+function pick(e) {
+  const r = renderer.domElement.getBoundingClientRect();
+  mouse.set((e.clientX - r.left) / r.width * 2 - 1, -(e.clientY - r.top) / r.height * 2 + 1);
+  ray.setFromCamera(mouse, camera);
+  const hit = ray.intersectObjects(meshes)[0];
+  return hit ? hit.object.userData.node : null;
+}
+renderer.domElement.addEventListener('pointerdown', e => { downAt = [e.clientX, e.clientY]; });
+renderer.domElement.addEventListener('pointerup', e => {
+  if (!downAt) return;
+  const moved = Math.hypot(e.clientX - downAt[0], e.clientY - downAt[1]); downAt = null;
+  if (moved < 6) { const n = pick(e); if (n) select(n, true); }
+});
+renderer.domElement.addEventListener('pointermove', e => {
+  if (e.pointerType !== 'mouse' || e.buttons) return;
+  hovered = pick(e);
+  renderer.domElement.style.cursor = hovered ? 'pointer' : 'grab';
+});
+
+// ---------- Schleife ----------
+function resize() {
+  const w = window.innerWidth, h = window.innerHeight;
+  renderer.setSize(w, h); camera.aspect = w / h; camera.updateProjectionMatrix();
+}
+window.addEventListener('resize', resize); resize();
+applyFilter('all');
+
+const tmp = new V();
+function frame(now) {
+  if (fly) {
+    const k = Math.min(1, (now - fly.s) / fly.d), e = k < .5 ? 4 * k * k * k : 1 - Math.pow(-2 * k + 2, 3) / 2;
+    controls.target.lerpVectors(fly.ft, fly.tt, e); camera.position.lerpVectors(fly.fp, fly.tp, e);
+    if (k >= 1) fly = null;
+  }
+  controls.update();
+  fill.position.copy(camera.position);
+  const pulse = reduceMotion ? 1 : 1 + Math.sin(now / 520) * 0.12;
+  nodes.forEach(n => { if (n.halo) n.halo.scale.setScalar(n.size * 6 * pulse); });
+  renderer.render(scene, camera);
+
+  const w = window.innerWidth, h = window.innerHeight;
+  nodes.forEach(n => {
+    tmp.copy(n.pos).project(camera);
+    const dist = camera.position.distanceTo(n.pos);
+    let vis = tmp.z < 1 && tmp.z > -1 && Math.abs(tmp.x) < 1.2 && Math.abs(tmp.y) < 1.2;
+    let op = 1;
+    if (vis) {
+      const ctx = n === selected || n === hovered || (selected && (n.parent === selected || selected.parent === n));
+      if (!passes(n) && !ctx) vis = false;
+      else if (n.depth <= 1 || n.t === 1 || ctx) op = 1;
+      else if (n.t === 2 || n.r) op = Math.max(0, Math.min(1, (120 - dist) / 30));
+      else op = Math.max(0, Math.min(1, (62 - dist) / 18));
+      if (op <= 0.02) vis = false;
+    }
+    if (!vis) { if (n.el.style.display !== 'none') n.el.style.display = 'none'; return; }
+    if (n.el.style.display === 'none') n.el.style.display = '';
+    const x = (tmp.x + 1) / 2 * w, y = (1 - tmp.y) / 2 * h;
+    n.el.style.transform = 'translate(' + x.toFixed(1) + 'px,' + y.toFixed(1) + 'px) translate(-50%, ' + (n.depth <= 1 ? '-140%' : '12px') + ')';
+    n.el.style.opacity = op;
+    n.el.style.zIndex = n.t === 1 ? 3 : n.depth <= 1 ? 2 : 1;
+  });
+  requestAnimationFrame(frame);
+}
+requestAnimationFrame(frame);
+</script>
