@@ -479,6 +479,7 @@ document.getElementById("mm-groesser").addEventListener("click", () => { mm.zoom
 
 if (DATEN.modus === "freunde") {
   /* Freunde-Ansicht: nur Mindmaps und ein Link zum Eintragen */
+  document.title = "Xpify Ideen-Mindmap";
   document.querySelector("h1").textContent = "Ideen-Mindmap";
   document.querySelector(".kicker").textContent = "Ideen eintragen · Freunde-Ansicht";
   const status = document.querySelector(".systemstatus");
