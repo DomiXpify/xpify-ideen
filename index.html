@@ -1,0 +1,484 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Agenten-Dashboard</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap">
+<style>
+:root {
+  --bg: #050814;
+  --panel: rgba(14, 19, 40, .72);
+  --line: rgba(99, 226, 255, .16);
+  --line-hot: rgba(99, 226, 255, .55);
+  --fg: #e9ecff;
+  --muted: #8189b3;
+  --gold: #ffc94a;
+  --cyan: #63e2ff;
+  --violet: #b58cff;
+  --risk: #ff8573;
+  --ok: #6ee7a0;
+  --display: 'Chakra Petch', 'Segoe UI', system-ui, sans-serif;
+  --body: 'Inter', 'Segoe UI', system-ui, sans-serif;
+  --mono: 'JetBrains Mono', Consolas, monospace;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+html, body { min-height: 100%; }
+body {
+  margin: 0; color: var(--fg); font: 14px/1.5 var(--body);
+  background:
+    radial-gradient(1200px 700px at 85% -10%, rgba(181,140,255,.13), transparent 60%),
+    radial-gradient(900px 600px at -10% 10%, rgba(99,226,255,.12), transparent 60%),
+    var(--bg);
+  background-attachment: fixed;
+}
+/* feines Raster wie auf einem Hologramm-Tisch */
+body::before {
+  content: ""; position: fixed; inset: 0; pointer-events: none; z-index: 0;
+  background-image:
+    linear-gradient(rgba(99,226,255,.05) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(99,226,255,.05) 1px, transparent 1px);
+  background-size: 44px 44px;
+  mask-image: radial-gradient(ellipse at center, #000 30%, transparent 80%);
+}
+/* leichte Scanlinien */
+body::after {
+  content: ""; position: fixed; inset: 0; pointer-events: none; z-index: 1;
+  background: repeating-linear-gradient(180deg, rgba(255,255,255,.018) 0 1px, transparent 1px 3px);
+}
+.wrap { position: relative; z-index: 2; }
+
+header {
+  padding: 22px 28px 16px; display: flex; flex-wrap: wrap; gap: 16px; align-items: flex-end; justify-content: space-between;
+  border-bottom: 1px solid var(--line);
+  background: linear-gradient(180deg, rgba(99,226,255,.06), transparent);
+}
+h1 {
+  margin: 0; font: 700 26px/1.1 var(--display); letter-spacing: .14em; text-transform: uppercase;
+  background: linear-gradient(90deg, var(--cyan), var(--violet) 55%, var(--gold));
+  -webkit-background-clip: text; background-clip: text; color: transparent;
+  text-shadow: 0 0 30px rgba(99,226,255,.15);
+}
+.kicker { font: 500 11px var(--mono); letter-spacing: .25em; color: var(--cyan); text-transform: uppercase; opacity: .85; margin-bottom: 6px; }
+.stand { font: 12px var(--mono); color: var(--muted); }
+.systemstatus { font: 12px var(--mono); color: var(--muted); display: flex; gap: 14px; align-items: center; }
+
+nav { display: flex; gap: 8px; flex-wrap: wrap; padding: 14px 28px; border-bottom: 1px solid var(--line); }
+nav button {
+  font: 600 12px var(--display); letter-spacing: .14em; text-transform: uppercase;
+  color: var(--muted); background: rgba(255,255,255,.02); border: 1px solid var(--line);
+  padding: 8px 14px; border-radius: 4px; cursor: pointer; transition: .2s;
+  clip-path: polygon(8px 0, 100% 0, calc(100% - 8px) 100%, 0 100%);
+}
+nav button:hover { color: var(--fg); border-color: var(--line-hot); }
+nav button.aktiv {
+  color: #071018; background: linear-gradient(90deg, var(--cyan), #9ef0ff);
+  border-color: transparent; box-shadow: 0 0 22px rgba(99,226,255,.35);
+}
+main { padding: 22px 28px 40px; }
+section.versteckt { display: none; }
+h2 { font: 700 13px var(--display); letter-spacing: .18em; text-transform: uppercase; color: var(--cyan); margin: 0 0 14px; }
+
+/* Kennzahlen oben */
+.kennzahlen { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 12px; margin-bottom: 22px; }
+.kz {
+  background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 14px 16px;
+  backdrop-filter: blur(10px);
+}
+.kz .wert { font: 700 30px/1 var(--display); color: var(--gold); text-shadow: 0 0 18px rgba(255,201,74,.35); }
+.kz .label { font: 11px var(--mono); color: var(--muted); letter-spacing: .12em; text-transform: uppercase; margin-top: 6px; }
+
+/* Agenten-Karten */
+.raster { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 16px; }
+.karte {
+  position: relative; overflow: hidden;
+  background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 18px 18px 16px;
+  backdrop-filter: blur(12px);
+  box-shadow: 0 0 40px rgba(99,226,255,.06), inset 0 1px 0 rgba(255,255,255,.05);
+}
+.karte::before {
+  content: ""; position: absolute; left: 0; right: 0; top: 0; height: 2px;
+  background: linear-gradient(90deg, transparent, var(--cyan), var(--violet), transparent);
+}
+.karte h3 { margin: 0; font: 700 17px var(--display); letter-spacing: .06em; }
+.rolle { color: var(--muted); font-size: 12px; margin: 2px 0 12px; }
+.pill {
+  display: inline-flex; align-items: center; gap: 8px; font: 500 11px var(--mono); letter-spacing: .1em; text-transform: uppercase;
+  padding: 4px 10px; border-radius: 999px; border: 1px solid var(--line); color: var(--ok);
+  background: rgba(110,231,160,.06);
+}
+.dot { width: 8px; height: 8px; border-radius: 50%; background: var(--ok); box-shadow: 0 0 10px var(--ok); animation: puls 2.4s ease-in-out infinite; }
+.pill.laeuft { color: var(--cyan); border-color: rgba(99,226,255,.45); background: rgba(99,226,255,.06); }
+.pill.laeuft .dot { background: var(--cyan); box-shadow: 0 0 10px var(--cyan); }
+@keyframes puls { 0%,100% { opacity: 1; transform: scale(1); } 50% { opacity: .4; transform: scale(.8); } }
+.zahlen { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin: 14px 0; }
+.zahlen div { background: rgba(255,255,255,.025); border: 1px solid rgba(255,255,255,.04); border-radius: 8px; padding: 8px 4px; text-align: center; }
+.zahlen b { display: block; font: 700 20px var(--display); color: var(--gold); }
+.zahlen span { font: 10px var(--mono); color: var(--muted); letter-spacing: .08em; text-transform: uppercase; }
+.zuletzt { font-size: 12.5px; color: var(--fg); opacity: .85; margin-top: 8px; }
+.meta { font: 11px var(--mono); color: var(--muted); margin-top: 8px; }
+ul.offen { list-style: none; margin: 10px 0 0; padding: 0; }
+ul.offen li { position: relative; padding-left: 16px; margin: 6px 0; font-size: 13px; }
+ul.offen li::before { content: "▸"; position: absolute; left: 0; color: var(--gold); }
+
+/* Suche */
+.suche {
+  width: 100%; max-width: 460px; background: rgba(5,8,20,.7); color: var(--fg); border: 1px solid var(--line);
+  border-radius: 8px; padding: 10px 14px; font: 13px var(--mono); margin-bottom: 16px; outline: none;
+}
+.suche:focus { border-color: var(--line-hot); box-shadow: 0 0 0 3px rgba(99,226,255,.12); }
+
+/* Verlauf */
+.eintrag {
+  position: relative; background: var(--panel); border: 1px solid var(--line); border-radius: 10px;
+  padding: 12px 14px 12px 18px; margin-bottom: 10px;
+}
+.eintrag::before { content: ""; position: absolute; left: 0; top: 10px; bottom: 10px; width: 3px; border-radius: 3px; background: var(--gold); box-shadow: 0 0 12px var(--gold); }
+.eintrag.Wissen::before { background: var(--cyan); box-shadow: 0 0 12px var(--cyan); }
+.eintrag .kopf { font: 11px var(--mono); color: var(--muted); letter-spacing: .05em; }
+.eintrag .titel { font: 600 15px var(--display); margin-top: 2px; }
+.eintrag .naechster { font-size: 12.5px; color: var(--muted); margin-top: 4px; }
+
+/* Mindmap-Bühne */
+.mm-leiste { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-bottom: 12px; }
+.mm-leiste button, .mm-leiste .knopf {
+  font: 600 11px var(--display); letter-spacing: .12em; text-transform: uppercase; cursor: pointer;
+  color: var(--muted); background: rgba(255,255,255,.02); border: 1px solid var(--line); padding: 7px 12px; border-radius: 4px;
+}
+.mm-leiste button:hover { color: var(--fg); border-color: var(--line-hot); }
+.mm-leiste button.aktiv { color: #071018; background: linear-gradient(90deg, var(--gold), #ffe49a); border-color: transparent; box-shadow: 0 0 18px rgba(255,201,74,.3); }
+.bühne {
+  position: relative; height: 70vh; min-height: 420px; overflow: auto; border-radius: 14px;
+  border: 1px solid var(--line); background: rgba(5,8,20,.75);
+  box-shadow: inset 0 0 80px rgba(99,226,255,.05);
+}
+.bühne svg { display: block; }
+.link { fill: none; stroke: rgba(99,226,255,.35); stroke-width: 1.5; }
+.link.hell { stroke: var(--gold); stroke-width: 2.2; filter: drop-shadow(0 0 4px rgba(255,201,74,.5)); }
+.knoten rect { rx: 8; ry: 8; fill: rgba(12,17,38,.92); stroke: rgba(99,226,255,.35); stroke-width: 1; transition: .2s; }
+.knoten:hover rect { stroke: var(--cyan); fill: rgba(20,28,60,.98); }
+.knoten text { font: 12px var(--body); fill: var(--fg); pointer-events: none; }
+.knoten .auf { font: 11px var(--mono); fill: var(--cyan); }
+.knoten.wurzel rect { fill: rgba(255,201,74,.12); stroke: var(--gold); stroke-width: 1.5; filter: drop-shadow(0 0 12px rgba(255,201,74,.35)); }
+.knoten.wurzel text { fill: var(--gold); font: 700 14px var(--display); letter-spacing: .04em; }
+.knoten.ebene1 rect { stroke: rgba(181,140,255,.6); }
+.knoten.ebene1 text { fill: #d9c9ff; font-weight: 600; }
+.knoten.treffer rect { stroke: var(--gold); stroke-width: 1.8; filter: drop-shadow(0 0 8px rgba(255,201,74,.5)); }
+.knoten.zu rect { stroke-dasharray: 4 3; }
+
+/* Wissen */
+details.box {
+  background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 10px 14px; margin-bottom: 12px;
+}
+details.box > summary { cursor: pointer; font: 700 14px var(--display); letter-spacing: .06em; }
+pre.code {
+  white-space: pre-wrap; font: 12px/1.55 var(--mono); color: #cfd6ff; max-height: 460px; overflow: auto;
+  background: rgba(5,8,20,.7); border: 1px solid var(--line); border-radius: 8px; padding: 12px; margin: 10px 0 0;
+}
+
+/* 3D */
+.hinweis { font: 12px var(--mono); color: var(--muted); margin-bottom: 12px; }
+.hinweis a { color: var(--cyan); }
+.rahmen { position: relative; border-radius: 14px; overflow: hidden; border: 1px solid var(--line); margin-bottom: 26px; box-shadow: 0 0 40px rgba(99,226,255,.08); }
+iframe { display: block; width: 100%; height: 75vh; border: 0; background: #000; }
+
+.leer { color: var(--muted); font: 13px var(--mono); }
+</style>
+</head>
+<body>
+<div class="wrap">
+<header>
+  <div>
+    <div class="kicker">Agenten · Ideen · Überwachung</div>
+    <h1>Agenten-Dashboard</h1>
+  </div>
+  <div class="systemstatus">
+    <span class="stand" id="stand"></span>
+    <span>lokal · nicht veröffentlicht</span>
+  </div>
+</header>
+<nav>
+  <button data-tab="uebersicht" class="aktiv">Übersicht</button>
+  <button data-tab="verlauf">Verlauf</button>
+  <button data-tab="mindmap">Mindmap</button>
+  <button data-tab="drei">3D-Maps</button>
+  <button data-tab="wissen">Wissen</button>
+</nav>
+<main>
+  <section id="uebersicht"></section>
+
+  <section id="verlauf" class="versteckt">
+    <input class="suche" type="search" placeholder="suchen in Ideen und Wissen …" data-suche="verlauf">
+    <div id="verlauf-liste"></div>
+  </section>
+
+  <section id="mindmap" class="versteckt">
+    <div class="mm-leiste" id="mm-agenten"></div>
+    <div class="mm-leiste">
+      <input class="suche" style="margin:0;max-width:280px" type="search" placeholder="im Baum suchen …" data-suche="mindmap">
+      <button id="mm-alle-auf">alle öffnen</button>
+      <button id="mm-ebene2">2 Ebenen</button>
+      <button id="mm-kleiner">−</button>
+      <button id="mm-groesser">+</button>
+    </div>
+    <div class="bühne" id="mm-bühne"></div>
+    <div class="hinweis" style="margin-top:8px">Tipp: Auf einen Knoten klicken, um Äste auf- oder zuzuklappen.</div>
+  </section>
+
+  <section id="drei" class="versteckt"></section>
+
+  <section id="wissen" class="versteckt">
+    <input class="suche" type="search" placeholder="im Wissen suchen …" data-suche="wissen">
+    <div id="wissen-liste"></div>
+  </section>
+</main>
+</div>
+
+<script>
+const DATEN = {"modus": "freunde", "stand": "", "agenten": [{"name": "Social-Media-Agent", "rolle": "", "status": "unbekannt", "was": "", "offen": [], "anzahl_ideen": 0, "anzahl_wissen": 0, "anzahl_knoten": 109, "letzte_aenderung": null, "mindmap": {"t": "Xpify Social", "c": [{"t": "Ziele", "c": [{"t": "Beta-Start 01.01.2027", "c": []}, {"t": "Warteliste und Beta-Tester sammeln", "c": []}, {"t": "Zahlenziele noch festlegen", "c": []}]}, {"t": "Zielgruppe", "c": [{"t": "Ab 16 Jahren", "c": []}, {"t": "Breite Masse mit Lust auf Selbstverbesserung", "c": []}, {"t": "Fitness", "c": []}, {"t": "Ernährung", "c": []}, {"t": "Lernen und Studium", "c": []}]}, {"t": "Content-Säulen", "c": [{"t": "Build in Public", "c": [{"t": "Anfänger baut App mit KI", "c": []}, {"t": "Countdown bis zur Beta", "c": []}, {"t": "Pannen und Erfolge", "c": []}, {"t": "Serie Ich teste meine eigene App", "c": [{"t": "Lebensfortschritt zeigen", "c": []}]}, {"t": "KI macht die Fleißarbeit", "c": []}]}, {"t": "Leben als Spiel", "c": [{"t": "XP für Alltag", "c": []}, {"t": "POV Level-Up", "c": []}, {"t": "Serie Lets LARP in", "c": [{"t": "Bibliothek", "c": []}, {"t": "Gym", "c": []}, {"t": "Diner", "c": []}, {"t": "Begriff LARP testen", "c": []}]}]}, {"t": "Coach-Wissen", "c": [{"t": "Fitness-Tipps", "c": []}, {"t": "Ernährungs-Tipps", "c": []}, {"t": "Lern-Tipps", "c": []}]}, {"t": "Community", "c": [{"t": "Abstimmungen über Funktionen", "c": []}, {"t": "Fragen beantworten", "c": []}, {"t": "Feedback-Fenster in der Beta", "c": []}]}]}, {"t": "Eyecatcher-Funktionen", "c": [{"t": "Jetzt oder bald filmbar", "c": [{"t": "Coach lässt Ausreden nicht durchgehen", "c": []}, {"t": "Konferenz plant meinen Tag", "c": []}, {"t": "3D-Stadt nur mit starkem Schnitt", "c": []}, {"t": "Fragekarten beim Kennenlernen", "c": []}]}, {"t": "Vor der Beta wenn gebaut", "c": [{"t": "Level-Up-Moment mit XP frühestens Ende Dezember", "c": []}, {"t": "Gym wächst in 3 Schritten mit Test-XP", "c": []}]}, {"t": "Nach der Beta", "c": [{"t": "Gym-Tower mit Etagen etwa Feb bis März", "c": []}, {"t": "Stadtbewohner werden sichtbar fitter", "c": []}, {"t": "Fokus-Timer mit wachsendem Baum", "c": []}]}, {"t": "Ehrlich als geplant zeigen", "c": []}, {"t": "Nichts ankündigen ohne Dominiks OK", "c": []}]}, {"t": "Formate", "c": [{"t": "Talking Head", "c": []}, {"t": "Screen-Recording der 3D-Stadt", "c": [{"t": "Risiko wirkt noch schwach", "c": []}, {"t": "Aufwerten mit Green-Screen", "c": []}, {"t": "Zooms und schnelle Schnitte", "c": []}]}, {"t": "POV-Sketche", "c": []}, {"t": "Vorher-Nachher der App", "c": []}, {"t": "Gespräch mit einem Coach", "c": []}, {"t": "Experten-Videos sind teuer", "c": [{"t": "KI-Coaches als Figuren zeigen", "c": []}, {"t": "Immer offen als KI kennzeichnen", "c": []}]}, {"t": "Memes", "c": [{"t": "Entwürfe vorschlagen, Dominik postet", "c": []}, {"t": "Keine automatische Suche und kein Auto-Posting", "c": []}]}]}, {"t": "Plattformen", "c": [{"t": "TikTok", "c": []}, {"t": "Instagram Reels", "c": []}, {"t": "Instagram Stories", "c": []}]}, {"t": "Branding", "c": [{"t": "Namens- und Hashtag-Ideen", "c": [{"t": "City of Hustlers", "c": []}, {"t": "Hustle Factory", "c": []}, {"t": "Coach craft", "c": []}, {"t": "Hustle gegen Friends nach Beta", "c": []}]}, {"t": "Kernbotschaften", "c": [{"t": "KI macht das Langweilige", "c": []}, {"t": "Die KI plant, du machst", "c": []}]}]}, {"t": "Launch-Plan", "c": [{"t": "Profil und Bio optimieren", "c": []}, {"t": "Warteliste mit Link in Bio", "c": []}, {"t": "Countdown-Videos", "c": []}, {"t": "Beta-Einladungen", "c": []}, {"t": "Feedback-Fenster als Tester-Argument", "c": []}]}, {"t": "Recht", "c": [{"t": "Impressum in Bio", "c": []}, {"t": "Commercial Music Library", "c": []}, {"t": "Keine Heilsversprechen", "c": []}, {"t": "Werbung kennzeichnen", "c": []}]}, {"t": "Kampagne Neujahr", "c": [{"t": "Werbung zu Neujahrsvorsaetzen", "c": [{"t": "Veroeffentlichung am 01.01.2027", "c": []}, {"t": "Werbung kennzeichnen", "c": []}]}]}, {"t": "Serie", "c": [{"t": "Marke Shortform-Serie passend zur App", "c": [{"t": "Danach App promoten", "c": []}, {"t": "Countdown-Serie bis 01.01.2027", "c": []}]}, {"t": "Stitches auf beliebte Shorts", "c": [{"t": "Trend-Check offen", "c": []}, {"t": "Urheberrecht beachten", "c": []}]}, {"t": "Wiedererkennbare Figur", "c": [{"t": "Mit Spiel-Designer abstimmen", "c": []}, {"t": "Keine doppelte Coach-Figur", "c": []}, {"t": "Erst die drei Coaches als Gesichter nutzen", "c": []}, {"t": "Neue Figur frühestens nach der Beta und Markenprüfung", "c": []}]}]}, {"t": "Ideen", "c": [{"t": "Siehe Eyecatcher und Serien", "c": []}]}, {"t": "Learnings", "c": [{"t": "noch keine Daten", "c": []}]}]}, "wissen_text": "", "3d": null}, {"name": "Spiel-Designer", "rolle": "", "status": "unbekannt", "was": "", "offen": [], "anzahl_ideen": 0, "anzahl_wissen": 0, "anzahl_knoten": 78, "letzte_aenderung": null, "mindmap": {"t": "Meine Ideen", "c": [{"t": "Xpify", "c": [{"t": "Kernmechanik", "c": [{"t": "Quests vom Coach-Team", "c": []}, {"t": "XP und Level per Regel-Code", "c": []}, {"t": "Streaks", "c": []}]}, {"t": "3D-Stadt", "c": [{"t": "Gebäude pro Coach", "c": []}, {"t": "Konferenzraum", "c": []}, {"t": "Animationen noch schwach", "c": []}]}, {"t": "Top 3 vor Beta laut Bewertung", "c": [{"t": "1 Gebäude-Stufen erst Gym", "c": []}, {"t": "2 Feedback-Fenster", "c": []}, {"t": "3 Fokus-Timer Bibliothek wächst", "c": []}]}, {"t": "Ideen für Xpify", "c": [{"t": "Stadtaufbau als Kern", "c": [{"t": "Konzept fertig", "c": []}, {"t": "Beta nur Gebäude-Stufen 1 bis 5", "c": []}, {"t": "Gebäude leveln mit eigenen XP", "c": []}, {"t": "Zwei Währungen XP und Baugeld", "c": []}, {"t": "Anwohner werden fitter und gesünder", "c": []}, {"t": "Gym wird zum Tower", "c": [{"t": "Zeitraffer-Montage fürs Marketing", "c": []}]}, {"t": "Max-Level selbst einrichten", "c": []}, {"t": "Uni-Gebäude fürs Lernen", "c": []}]}, {"t": "Lernen", "c": [{"t": "Fokus-Timer mit Wachstum", "c": []}, {"t": "KI-Lernkontrolle aus Notizen", "c": []}, {"t": "XP erst nach bestandener Prüfung", "c": []}]}, {"t": "Ernährung", "c": [{"t": "Beweisfoto für Mahlzeiten", "c": []}]}, {"t": "Erinnerungen vom Coach", "c": []}, {"t": "Gratis-Limit für KI-Nachrichten", "c": []}, {"t": "Beta-Test", "c": [{"t": "App selbst als Prototyp nutzen", "c": []}, {"t": "Feedback-Fenster für Tester", "c": []}]}, {"t": "Social nach Beta", "c": [{"t": "Freunde und Ranglisten", "c": []}, {"t": "Freunde-Rangliste nach Beta", "c": []}, {"t": "Hustle your Friends Modus", "c": []}]}, {"t": "Monetarisierung nach Beta", "c": [{"t": "Kosmetische Items", "c": []}, {"t": "Fairer Battle Pass prüfen", "c": []}]}]}]}, {"t": "Community nach Release", "c": [{"t": "Konzept fertig", "c": []}, {"t": "Ideen einreichen", "c": []}, {"t": "Abstimmung", "c": []}, {"t": "Wochen-Rangliste der besten Ideen", "c": []}, {"t": "Moderation melden und blockieren", "c": []}]}, {"t": "Marke", "c": [{"t": "Maskottchen-Figur Idee offen", "c": []}, {"t": "Wiedererkennung über die Coaches", "c": []}, {"t": "Figur nicht ähnlich bestehender Spiele", "c": []}]}, {"t": "Roadmap-Hinweise", "c": [{"t": "Reels mit geplanten Features vorab", "c": []}]}, {"t": "Namen", "c": [{"t": "City of Hustlers", "c": []}, {"t": "Hustle Factory", "c": []}, {"t": "Coach Craft", "c": []}, {"t": "Hustle gegen Friends", "c": []}, {"t": "Hustle your Friends", "c": []}]}, {"t": "Neue Spiele", "c": [{"t": "noch leer", "c": []}]}, {"t": "Neue Apps", "c": [{"t": "Erinnerungsagent", "c": []}, {"t": "Helfer-Agent für Routinearbeit", "c": [{"t": "Name ohne Sklaven-Bezug", "c": []}, {"t": "Ideen Sidekick oder Hustle Buddy", "c": []}]}]}, {"t": "Mechaniken-Sammlung", "c": [{"t": "Belohnung erst nach Nachweis", "c": []}, {"t": "Fortschritt spiegelt sich in Welt", "c": []}, {"t": "Zweckgebundene Gebäude-XP", "c": []}]}, {"t": "Inspiration", "c": [{"t": "Stil und Genre ja", "c": []}, {"t": "Grafiken nachbauen nein", "c": []}, {"t": "Lebendige Stadt-Animationen", "c": []}]}, {"t": "Learnings", "c": [{"t": "noch keine Daten", "c": []}]}]}, "wissen_text": "", "3d": null}], "verlauf": [], "offen": [], "formular": "https://docs.google.com/forms/d/e/1FAIpQLSe4OA5hHug6nWqVIedVBUUfRBewBem2pqQy6KmTYNxPQpirwQ/viewform?usp=publish-editor"};
+
+/* ---------- kleine Helfer ---------- */
+function el(tag, attrs, kinder) {
+  const e = document.createElement(tag);
+  for (const [k, v] of Object.entries(attrs || {})) {
+    if (v == null) continue;
+    if (k === "class") e.className = v; else e.setAttribute(k, v);
+  }
+  for (const k of [].concat(kinder ?? [])) {
+    if (k == null) continue;
+    e.append(k instanceof Node ? k : document.createTextNode(String(k)));
+  }
+  return e;
+}
+function svgEl(tag, attrs) {
+  const e = document.createElementNS("http://www.w3.org/2000/svg", tag);
+  for (const [k, v] of Object.entries(attrs || {})) if (v != null) e.setAttribute(k, v);
+  return e;
+}
+
+const STATUS = { idle: "bereit", laeuft: "läuft", unbekannt: "unbekannt" };
+
+/* ---------- Übersicht ---------- */
+function uebersicht() {
+  const wrap = document.getElementById("uebersicht");
+  const summe = (f) => DATEN.agenten.reduce((s, a) => s + f(a), 0);
+  wrap.append(el("div", { class: "kennzahlen" }, [
+    kz(summe(a => a.anzahl_ideen), "Ideen gesamt"),
+    kz(summe(a => a.anzahl_knoten), "Mindmap-Knoten"),
+    kz(summe(a => a.anzahl_wissen), "Wissens-Einträge"),
+    kz(DATEN.offen.length, "offene Schritte"),
+  ]));
+  wrap.append(el("h2", {}, "Agenten"));
+  const raster = el("div", { class: "raster" });
+  for (const a of DATEN.agenten) {
+    const st = a.status || "unbekannt";
+    raster.append(el("div", { class: "karte" }, [
+      el("div", { style: "display:flex;justify-content:space-between;gap:10px;align-items:flex-start" }, [
+        el("div", {}, [el("h3", {}, a.name), el("div", { class: "rolle" }, a.rolle)]),
+        el("span", { class: "pill " + st }, [el("span", { class: "dot" }), STATUS[st] || st]),
+      ]),
+      el("div", { class: "zahlen" }, [
+        el("div", {}, [el("b", {}, a.anzahl_ideen), el("span", {}, "Ideen")]),
+        el("div", {}, [el("b", {}, a.anzahl_knoten), el("span", {}, "Knoten")]),
+        el("div", {}, [el("b", {}, a.anzahl_wissen), el("span", {}, "Wissen")]),
+      ]),
+      a.was ? el("div", { class: "zuletzt" }, "› " + a.was) : null,
+      a.offen.length ? el("ul", { class: "offen" }, a.offen.map(o => el("li", {}, o))) : null,
+      el("div", { class: "meta" }, "letzte Änderung · " + (a.letzte_aenderung || "–")),
+    ]));
+  }
+  wrap.append(raster);
+
+  wrap.append(el("h2", { style: "margin-top:30px" }, "Nächste Schritte aus den Ideen"));
+  if (!DATEN.offen.length) {
+    wrap.append(el("div", { class: "leer" }, "keine offenen Schritte gefunden"));
+  } else {
+    wrap.append(el("ul", { class: "offen" }, DATEN.offen.map(o => el("li", {}, [
+      el("b", { style: "color:var(--gold)" }, o.agent + " · "), o.text, el("span", { class: "meta", style: "margin-left:6px" }, o.datum),
+    ]))));
+  }
+}
+function kz(wert, label) {
+  return el("div", { class: "kz" }, [el("div", { class: "wert" }, String(wert)), el("div", { class: "label" }, label)]);
+}
+
+/* ---------- Verlauf ---------- */
+function verlaufAnzeigen(filter) {
+  const liste = document.getElementById("verlauf-liste");
+  liste.replaceChildren();
+  const f = filter.toLowerCase();
+  const treffer = DATEN.verlauf.filter(e => (e.titel + " " + e.text + " " + e.agent).toLowerCase().includes(f));
+  if (!treffer.length) { liste.append(el("div", { class: "leer" }, "keine Treffer")); return; }
+  for (const e of treffer) {
+    liste.append(el("div", { class: "eintrag " + e.art }, [
+      el("div", { class: "kopf" }, e.datum + "  ·  " + e.agent + "  ·  " + e.art),
+      el("div", { class: "titel" }, e.titel),
+      e.naechster ? el("div", { class: "naechster" }, "→ " + e.naechster) : null,
+    ]));
+  }
+}
+
+/* ---------- Mindmap als Knotenbaum (SVG) ---------- */
+const mm = { idx: 0, zoom: 1, collapsed: new Set(), suche: "" };
+const KNOTEN_B = 220, KNOTEN_H = 34, ZEILE = 52, SPALTE = 270, RAND = 30;
+
+function kürzen(t, n) { return t.length > n ? t.slice(0, n - 1) + "…" : t; }
+
+function layout(wurzel) {
+  const knoten = [], kanten = [];
+  let blatt = 0;
+  function gehe(n, tiefe, pfad) {
+    const key = mm.idx + "|" + pfad;
+    const hatKinder = n.c.length > 0;
+    const zu = hatKinder && mm.collapsed.has(key);
+    const k = { t: n.t, tiefe, key, hatKinder, zu, x: RAND + tiefe * SPALTE, y: 0,
+                treffer: mm.suche && n.t.toLowerCase().includes(mm.suche) };
+    knoten.push(k);
+    if (hatKinder && !zu) {
+      const kinder = n.c.map((c, i) => gehe(c, tiefe + 1, pfad + "/" + i));
+      k.y = (kinder[0].y + kinder[kinder.length - 1].y) / 2;
+      kinder.forEach(c => kanten.push([k, c]));
+    } else {
+      k.y = RAND + blatt * ZEILE;
+      blatt++;
+    }
+    return k;
+  }
+  gehe(wurzel, 0, "0");
+  return { knoten, kanten };
+}
+
+function zeichneMindmap() {
+  const bühne = document.getElementById("mm-bühne");
+  bühne.replaceChildren();
+  const a = DATEN.agenten[mm.idx];
+  if (!a || !a.mindmap) { bühne.append(el("div", { class: "leer", style: "padding:24px" }, "Für diesen Agenten gibt es keine Mindmap.")); return; }
+  const { knoten, kanten } = layout(a.mindmap);
+  const breite = Math.max(...knoten.map(k => k.x)) + KNOTEN_B + RAND * 2;
+  const höhe = Math.max(...knoten.map(k => k.y)) + KNOTEN_H + RAND * 2;
+  const svg = svgEl("svg", { width: breite * mm.zoom, height: höhe * mm.zoom, viewBox: `0 0 ${breite} ${höhe}` });
+
+  for (const [p, c] of kanten) {
+    const x1 = p.x + KNOTEN_B, y1 = p.y + KNOTEN_H / 2, x2 = c.x, y2 = c.y + KNOTEN_H / 2;
+    const mx = (x1 + x2) / 2;
+    const hell = p.tiefe === 0 || c.treffer;
+    svg.append(svgEl("path", { d: `M${x1},${y1} C${mx},${y1} ${mx},${y2} ${x2},${y2}`, class: "link" + (hell ? " hell" : "") }));
+  }
+  for (const k of knoten) {
+    const klasse = ["knoten", k.tiefe === 0 ? "wurzel" : "", k.tiefe === 1 ? "ebene1" : "", k.treffer ? "treffer" : "", k.zu ? "zu" : ""].join(" ").replace(/\s+/g, " ").trim();
+    const g = svgEl("g", { class: klasse, transform: `translate(${k.x},${k.y})` });
+    g.append(svgEl("rect", { width: KNOTEN_B, height: KNOTEN_H }));
+    const txt = svgEl("text", { x: 12, y: KNOTEN_H / 2 + 4 });
+    txt.textContent = kürzen(k.t, 26);
+    g.append(txt);
+    if (k.hatKinder) {
+      const z = svgEl("text", { class: "auf", x: KNOTEN_B - 10, y: KNOTEN_H / 2 + 4, "text-anchor": "end" });
+      z.textContent = k.zu ? "+" : "−";
+      g.append(z);
+    }
+    const titel = svgEl("title", {}); titel.textContent = k.t; g.append(titel);
+    if (k.hatKinder) {
+      g.style.cursor = "pointer";
+      g.addEventListener("click", () => {
+        if (mm.collapsed.has(k.key)) mm.collapsed.delete(k.key); else mm.collapsed.add(k.key);
+        zeichneMindmap();
+      });
+    }
+    svg.append(g);
+  }
+  bühne.append(svg);
+}
+
+function ebeneZuklappen(ebene) {
+  mm.collapsed.clear();
+  const a = DATEN.agenten[mm.idx];
+  if (!a || !a.mindmap) return;
+  (function gehe(n, tiefe, pfad) {
+    if (n.c.length && tiefe >= ebene) mm.collapsed.add(mm.idx + "|" + pfad);
+    n.c.forEach((c, i) => gehe(c, tiefe + 1, pfad + "/" + i));
+  })(a.mindmap, 0, "0");
+}
+
+function mindmapAgentenLeiste() {
+  const leiste = document.getElementById("mm-agenten");
+  leiste.replaceChildren();
+  DATEN.agenten.forEach((a, i) => {
+    const b = el("button", { class: i === mm.idx ? "aktiv" : "" }, a.name);
+    b.addEventListener("click", () => { mm.idx = i; mm.collapsed.clear(); mindmapAgentenLeiste(); zeichneMindmap(); });
+    leiste.append(b);
+  });
+}
+
+/* ---------- Wissen ---------- */
+function wissenAnzeigen(filter) {
+  const liste = document.getElementById("wissen-liste");
+  liste.replaceChildren();
+  const f = filter.toLowerCase();
+  for (const a of DATEN.agenten) {
+    const text = a.wissen_text || "(noch keine Datei)";
+    if (f && !text.toLowerCase().includes(f)) continue;
+    liste.append(el("details", { class: "box", open: f ? "" : null }, [
+      el("summary", {}, a.name + "  —  " + a.anzahl_wissen + " Einträge"),
+      el("pre", { class: "code" }, text),
+    ]));
+  }
+}
+
+/* ---------- 3D ---------- */
+function dreiAnzeigen() {
+  const wrap = document.getElementById("drei");
+  wrap.replaceChildren();
+  wrap.append(el("div", { class: "hinweis" }, "Die 3D-Maps bleiben unverändert. Sie laden three.js aus dem Internet."));
+  for (const a of DATEN.agenten) {
+    if (!a["3d"]) continue;
+    wrap.append(el("h2", {}, a.name));
+    wrap.append(el("div", { class: "hinweis" }, [el("a", { href: a["3d"], target: "_blank" }, "in neuem Fenster öffnen ↗")]));
+    wrap.append(el("div", { class: "rahmen" }, [el("iframe", { src: a["3d"], title: a.name + " 3D" })]));
+  }
+}
+
+/* ---------- Navigation ---------- */
+function zeigeTab(name) {
+  for (const s of document.querySelectorAll("main > section")) s.classList.toggle("versteckt", s.id !== name);
+  for (const b of document.querySelectorAll("nav button")) b.classList.toggle("aktiv", b.dataset.tab === name);
+}
+
+document.getElementById("stand").textContent = "stand · " + DATEN.stand;
+document.querySelectorAll("nav button").forEach(b => b.addEventListener("click", () => zeigeTab(b.dataset.tab)));
+document.querySelectorAll("input[data-suche]").forEach(i => i.addEventListener("input", () => {
+  if (i.dataset.suche === "verlauf") verlaufAnzeigen(i.value);
+  if (i.dataset.suche === "wissen") wissenAnzeigen(i.value);
+  if (i.dataset.suche === "mindmap") { mm.suche = i.value.toLowerCase(); zeichneMindmap(); }
+}));
+document.getElementById("mm-alle-auf").addEventListener("click", () => { mm.collapsed.clear(); zeichneMindmap(); });
+document.getElementById("mm-ebene2").addEventListener("click", () => { ebeneZuklappen(2); zeichneMindmap(); });
+document.getElementById("mm-kleiner").addEventListener("click", () => { mm.zoom = Math.max(.5, mm.zoom - .1); zeichneMindmap(); });
+document.getElementById("mm-groesser").addEventListener("click", () => { mm.zoom = Math.min(2, mm.zoom + .1); zeichneMindmap(); });
+
+if (DATEN.modus === "freunde") {
+  /* Freunde-Ansicht: nur Mindmaps und ein Link zum Eintragen */
+  document.querySelector("h1").textContent = "Ideen-Mindmap";
+  document.querySelector(".kicker").textContent = "Ideen eintragen · Freunde-Ansicht";
+  const status = document.querySelector(".systemstatus");
+  status.replaceChildren();
+  if (DATEN.formular) {
+    status.append(el("a", { href: DATEN.formular, target: "_blank", style: "color:var(--gold);font:600 12px var(--display);letter-spacing:.12em;text-transform:uppercase;text-decoration:none;border:1px solid rgba(255,201,74,.5);padding:8px 14px;border-radius:4px" }, "Idee eintragen ↗"));
+  }
+  document.querySelectorAll("nav button").forEach(b => { if (b.dataset.tab !== "mindmap") b.remove(); });
+  zeigeTab("mindmap");
+  mindmapAgentenLeiste();
+  zeichneMindmap();
+} else {
+  uebersicht();
+  verlaufAnzeigen("");
+  mindmapAgentenLeiste();
+  zeichneMindmap();
+  wissenAnzeigen("");
+  dreiAnzeigen();
+}
+</script>
+</body>
+</html>
